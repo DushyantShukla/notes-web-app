@@ -11,37 +11,53 @@ import {
 import './App.css';
 import Routes from './Routes';
 import RouteNavItem from './components/RouteNavItem';
+import { authUser, signOutUser } from "./libs/awsLib";
 
 class App extends Component {
   constructor(props) {
-  super(props);
+    super(props);
 
-  this.state = {
-    userToken: null,
-  };
-}
+    this.state = {
+      isAuthenticated: false,
+      isAuthenticating: true
+    };
+  }
 
-updateUserToken = (userToken) => {
-  this.setState({
-    userToken: userToken
-  });
-}
+  async componentDidMount() {
+    try {
+      if (await authUser()) {
+        this.userHasAuthenticated(true);
+      }
+    }
+    catch (e) {
+      alert(e);
+    }
+
+    this.setState({ isAuthenticating: false });
+  }
+
+  userHasAuthenticated = authenticated => {
+    this.setState({ isAuthenticated: authenticated });
+  }
 
   handleNavLink = (event) => {
-  event.preventDefault();
-  this.props.history.push(event.currentTarget.getAttribute('href'));
-}
+    event.preventDefault();
+    this.props.history.push(event.currentTarget.getAttribute('href'));
+  }
 
-handleLogout = (event) => {
-  this.updateUserToken(null);
-}
+  handleLogout = event => {
+    signOutUser();
+    this.userHasAuthenticated(false);
+    this.props.history.push("/login");
+  }
 
   render() {
     const childProps = {
-  userToken: this.state.userToken,
-  updateUserToken: this.updateUserToken,
-};
+      isAuthenticated: this.state.isAuthenticated,
+      userHasAuthenticated: this.userHasAuthenticated
+    };
     return (
+      !this.state.isAuthenticating &&
       <div className="App container">
         <Navbar fluid collapseOnSelect>
           <Navbar.Header>
@@ -52,10 +68,10 @@ handleLogout = (event) => {
           </Navbar.Header>
           <Navbar.Collapse>
             <Nav pullRight>
-              { this.state.userToken
-  ? <NavItem onClick={this.handleLogout}>Logout</NavItem>
-  : [ <RouteNavItem key={1} onClick={this.handleNavLink} href="/signup">Signup</RouteNavItem>,
-      <RouteNavItem key={2} onClick={this.handleNavLink} href="/login">Login</RouteNavItem> ] }
+              {this.state.isAuthenticated
+                ? <NavItem onClick={this.handleLogout}>Logout</NavItem>
+                : [<RouteNavItem key={1} onClick={this.handleNavLink} href="/signup">Signup</RouteNavItem>,
+                <RouteNavItem key={2} onClick={this.handleNavLink} href="/login">Login</RouteNavItem>]}
             </Nav>
           </Navbar.Collapse>
         </Navbar>

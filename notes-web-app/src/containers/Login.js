@@ -1,10 +1,6 @@
 import React, { Component } from 'react';
-import {
-  Button,
-  FormGroup,
-  FormControl,
-  ControlLabel,
-} from 'react-bootstrap';
+import { FormGroup, FormControl, ControlLabel } from "react-bootstrap";
+import LoaderButton from "../components/LoaderButton";
 import './Login.css';
 import config from '../config.js';
 import {
@@ -18,13 +14,14 @@ class Login extends Component {
     super(props);
 
     this.state = {
-      username: '',
-      password: '',
+      isLoading: false,
+      email: "",
+      password: "",
     };
   }
 
   validateForm() {
-    return this.state.username.length > 0
+    return this.state.email.length > 0
       && this.state.password.length > 0;
   }
 
@@ -35,48 +32,49 @@ class Login extends Component {
   }
 
   handleSubmit = async (event) => {
-  event.preventDefault();
-
-  try {
-    const userToken = await this.login(this.state.username, this.state.password);
-    this.props.updateUserToken(userToken);
+    event.preventDefault();
+    this.setState({ isLoading: true });
+    try {
+      await this.login(this.state.email, this.state.password);
+      this.props.userHasAuthenticated(true);
+      this.props.history.push("/");
+    } catch (e) {
+      alert(e);
+      this.setState({ isLoading: false });
+    }
   }
-  catch(e) {
-    alert(e);
+
+  login(email, password) {
+    const userPool = new CognitoUserPool({
+      UserPoolId: config.cognito.USER_POOL_ID,
+      ClientId: config.cognito.APP_CLIENT_ID
+    });
+    const authenticationData = {
+      Username: email,
+      Password: password
+    };
+
+    const user = new CognitoUser({ Username: email, Pool: userPool });
+    const authenticationDetails = new AuthenticationDetails(authenticationData);
+
+    return new Promise((resolve, reject) => (
+      user.authenticateUser(authenticationDetails, {
+        onSuccess: (result) => resolve(),
+        onFailure: (err) => reject(err),
+      })
+    ));
   }
-}
-
-  login(username, password) {
-  const userPool = new CognitoUserPool({
-    UserPoolId: config.cognito.USER_POOL_ID,
-    ClientId: config.cognito.APP_CLIENT_ID
-  });
-  const authenticationData = {
-    Username: username,
-    Password: password
-  };
-
-  const user = new CognitoUser({ Username: username, Pool: userPool });
-  const authenticationDetails = new AuthenticationDetails(authenticationData);
-
-  return new Promise((resolve, reject) => (
-    user.authenticateUser(authenticationDetails, {
-      onSuccess: (result) => resolve(result.getIdToken().getJwtToken()),
-      onFailure: (err) => reject(err),
-    })
-  ));
-}
 
   render() {
     return (
       <div className="Login">
         <form onSubmit={this.handleSubmit}>
-          <FormGroup controlId="username" bsSize="large">
+          <FormGroup controlId="email" bsSize="large">
             <ControlLabel>Email</ControlLabel>
             <FormControl
               autoFocus
               type="email"
-              value={this.state.username}
+              value={this.state.email}
               onChange={this.handleChange} />
           </FormGroup>
           <FormGroup controlId="password" bsSize="large">
@@ -86,13 +84,15 @@ class Login extends Component {
               onChange={this.handleChange}
               type="password" />
           </FormGroup>
-          <Button
+          <LoaderButton
             block
             bsSize="large"
-            disabled={ ! this.validateForm() }
-            type="submit">
-            Login
-          </Button>
+            disabled={!this.validateForm()}
+            type="submit"
+            isLoading={this.state.isLoading}
+            text="Login"
+            loadingText="Logging in…"
+          />
         </form>
       </div>
     );
